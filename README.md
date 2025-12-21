@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="#features">Features</a> •
+  <a href="#demo">Demo</a> •
   <a href="#the-problem">The Problem</a> •
   <a href="#how-it-works">How It Works</a> •
   <a href="#installation">Installation</a> •
@@ -29,6 +30,14 @@
 - 🎨 **Modern Web UI** – Dark glassmorphism theme with drag-and-drop file upload
 - 📊 **Real-time Progress** – Server-Sent Events (SSE) for live translation status updates
 - 🔐 **Secure** – API keys stored locally, never transmitted to third parties
+
+---
+
+## 🎥 Demo
+
+<p align="center">
+  <img src="assets/demo.gif" alt="Smart SRT Translator Demo" width="700"/>
+</p>
 
 ---
 
