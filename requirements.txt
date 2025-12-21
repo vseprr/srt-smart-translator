@@ -1,0 +1,10 @@
+# Smart SRT Translator - Dependencies
+# Install with: pip install -r requirements.txt
+
+flask>=3.0.0
+pysrt>=1.1.2
+spacy>=3.7.0
+requests>=2.31.0
+
+# Note: After installing, download the SpaCy English model:
+# python -m spacy download en_core_web_sm

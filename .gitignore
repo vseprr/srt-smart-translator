@@ -1,0 +1,39 @@
+# Environment and secrets
+.env
+*.env.*
+config.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment
+venv/
+.venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Output files
+*_output.srt
+test_output.srt
+
+# SRT files (user's personal files)
+*.srt
+!example.srt
+
+# Web UI temp folders
+uploads/*
+outputs/*
+!uploads/.gitkeep
+!outputs/.gitkeep
+
+# Internal dev documentation (Turkish)
+memory/
+

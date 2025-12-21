@@ -1,0 +1,34 @@
+1
+00:00:01,000 --> 00:00:03,500
+I went to the store yesterday
+
+2
+00:00:03,600 --> 00:00:06,000
+and bought some fresh milk.
+
+3
+00:00:07,000 --> 00:00:09,500
+The weather was really nice,
+
+4
+00:00:09,600 --> 00:00:12,000
+so I decided to walk home.
+
+5
+00:00:13,000 --> 00:00:16,500
+It took about twenty minutes
+but I enjoyed every moment.
+
+6
+00:00:17,000 --> 00:00:19,500
+When I got home, I made
+
+7
+00:00:19,600 --> 00:00:22,000
+a delicious cup of coffee.
+
+8
+00:00:23,000 --> 00:00:26,000
+Sometimes the simple things in life
+bring the most joy.
+
