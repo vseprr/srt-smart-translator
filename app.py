@@ -1,35 +1,36 @@
 """
 app.py - Flask Web Server for Smart SRT Translator
 
-Modern web arayüzü ile SRT dosyası çevirisi.
+Modern web interface for SRT file translation with on-demand SpaCy model management.
 """
 
 import os
 import json
 import uuid
-import shutil
 import threading
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, Response, send_file
+from flask import Flask, render_template, request, jsonify, Response, send_file, redirect, url_for
 from werkzeug.utils import secure_filename
 
-# Proje modülleri
+# Project modules
 from parser import parse_srt, save_srt
-from engine import merge_sentences, smart_split
+from engine import merge_sentences_with_manager, smart_split
 from translator import DeepLTranslator, TranslationConfig
+from backend.model_manager import get_model_manager
+from backend.language_data import PRESET_MODELS, ALL_LANGUAGES
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['OUTPUT_FOLDER'] = 'outputs'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 
-# Klasörleri oluştur
+# Create folders
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
 
 
 def cleanup_temp_files():
-    """Önceki oturumdan kalan geçici dosyaları temizle."""
+    """Clean up temp files from previous session."""
     count = 0
     for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER']]:
         if os.path.exists(folder):
@@ -42,17 +43,16 @@ def cleanup_temp_files():
                 except Exception:
                     pass
     if count > 0:
-        print(f"  🧹 {count} eski dosya temizlendi.")
+        print(f"  🧹 Cleaned up {count} old files.")
 
 
-# Sunucu başlarken önceki oturumdan kalan dosyaları temizle
+# Clean up on startup
 cleanup_temp_files()
 
-
-# İşlem durumu takibi
+# Job tracking
 translation_jobs = {}
 
-# DeepL desteklenen diller
+# DeepL supported languages (target languages)
 DEEPL_LANGUAGES = {
     "TR": "Türkçe",
     "EN-US": "English (US)",
@@ -89,19 +89,163 @@ DEEPL_LANGUAGES = {
 }
 
 
+# ============================================================
+# SETUP CHECK MIDDLEWARE
+# ============================================================
+
+@app.before_request
+def check_setup():
+    """Redirect to setup if no models are configured."""
+    manager = get_model_manager()
+    
+    # Allow these endpoints without setup
+    allowed_endpoints = ['setup', 'static', 'api_install_model']
+    
+    if request.endpoint in allowed_endpoints:
+        return None
+    
+    if not manager.is_setup_complete():
+        return redirect(url_for('setup'))
+    
+    return None
+
+
+# ============================================================
+# SETUP WIZARD
+# ============================================================
+
+@app.route('/setup', methods=['GET'])
+def setup():
+    """First-run setup wizard."""
+    manager = get_model_manager()
+    
+    # If already set up, redirect to home
+    if manager.is_setup_complete():
+        return redirect(url_for('index'))
+    
+    return render_template(
+        'setup.html',
+        preset_models=PRESET_MODELS,
+        all_languages=ALL_LANGUAGES
+    )
+
+
+# ============================================================
+# SETTINGS PAGE
+# ============================================================
+
+@app.route('/settings')
+def settings():
+    """Settings page for model management."""
+    manager = get_model_manager()
+    
+    return render_template(
+        'settings.html',
+        models=manager.get_installed_models(),
+        all_languages=ALL_LANGUAGES
+    )
+
+
+# ============================================================
+# MAIN PAGE
+# ============================================================
+
 @app.route('/')
 def index():
-    """Ana sayfa."""
-    return render_template('index.html', languages=DEEPL_LANGUAGES)
+    """Main page."""
+    manager = get_model_manager()
+    active_model = manager.get_active_model_info()
+    
+    return render_template(
+        'index.html',
+        languages=DEEPL_LANGUAGES,
+        active_model=active_model
+    )
 
 
 @app.route('/languages')
 def get_languages():
-    """Desteklenen dilleri döndür."""
+    """Return supported languages."""
     return jsonify(DEEPL_LANGUAGES)
 
 
-# Config file for API key storage
+# ============================================================
+# API: MODEL MANAGEMENT
+# ============================================================
+
+@app.route('/api/install-model', methods=['POST'])
+def api_install_model():
+    """Install a SpaCy model."""
+    data = request.get_json()
+    install_cmd = data.get('install_cmd', '')
+    model_name = data.get('model_name', '')
+    lang_code = data.get('lang_code', '')
+    
+    if not all([install_cmd, model_name, lang_code]):
+        return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+    
+    manager = get_model_manager()
+    result = manager.install_model(install_cmd, model_name, lang_code)
+    
+    if result['success']:
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+
+@app.route('/api/remove-model', methods=['POST'])
+def api_remove_model():
+    """Remove a model from configuration and uninstall from pip."""
+    data = request.get_json()
+    model_name = data.get('model_name', '')
+    
+    if not model_name:
+        return jsonify({'success': False, 'error': 'Model name required'}), 400
+    
+    manager = get_model_manager()
+    result = manager.remove_model(model_name)
+    
+    if result.get('success'):
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+
+@app.route('/api/detect-language', methods=['POST'])
+def api_detect_language():
+    """Detect language of text."""
+    data = request.get_json()
+    text = data.get('text', '')
+    
+    if not text:
+        return jsonify({'lang': 'unknown', 'confidence': 0})
+    
+    manager = get_model_manager()
+    lang, confidence = manager.detect_language(text)
+    
+    return jsonify({
+        'lang': lang,
+        'confidence': confidence,
+        'language_name': ALL_LANGUAGES.get(lang, lang.upper())
+    })
+
+
+@app.route('/api/model-status')
+def api_model_status():
+    """Get current model status."""
+    manager = get_model_manager()
+    
+    return jsonify({
+        'setup_complete': manager.is_setup_complete(),
+        'installed_models': manager.get_installed_models(),
+        'active_model': manager.get_active_model_info()
+    })
+
+
+# ============================================================
+# API: CONFIG (DeepL API Key)
+# ============================================================
+
 CONFIG_FILE = 'config.json'
 
 
@@ -133,7 +277,6 @@ def get_config():
     """Check if API key is configured."""
     api_key = get_api_key()
     has_key = bool(api_key and len(api_key) > 10)
-    # Mask the key for display
     masked_key = ''
     if has_key:
         masked_key = api_key[:8] + '...' + api_key[-4:] if len(api_key) > 12 else '***'
@@ -150,13 +293,13 @@ def save_api_config():
     api_key = data.get('api_key', '').strip()
     
     if not api_key:
-        return jsonify({'error': 'API anahtarı boş olamaz'}), 400
+        return jsonify({'error': 'API key cannot be empty'}), 400
     
     config = load_config()
     config['deepl_api_key'] = api_key
     save_config(config)
     
-    return jsonify({'message': 'API anahtarı kaydedildi', 'success': True})
+    return jsonify({'message': 'API key saved', 'success': True})
 
 
 @app.route('/api/config', methods=['DELETE'])
@@ -167,62 +310,111 @@ def delete_api_config():
         del config['deepl_api_key']
         save_config(config)
     
-    return jsonify({'message': 'API anahtarı kaldırıldı', 'success': True})
+    return jsonify({'message': 'API key removed', 'success': True})
 
+
+# ============================================================
+# FILE UPLOAD & TRANSLATION
+# ============================================================
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """SRT dosyası yükle."""
+    """Upload SRT file."""
     if 'file' not in request.files:
-        return jsonify({'error': 'Dosya bulunamadı'}), 400
+        return jsonify({'error': 'No file found'}), 400
     
     file = request.files['file']
     if file.filename == '':
-        return jsonify({'error': 'Dosya seçilmedi'}), 400
+        return jsonify({'error': 'No file selected'}), 400
     
     if not file.filename.lower().endswith('.srt'):
-        return jsonify({'error': 'Sadece SRT dosyaları kabul edilir'}), 400
+        return jsonify({'error': 'Only SRT files are accepted'}), 400
     
-    # Benzersiz ID ile kaydet
+    # Save with unique ID
     job_id = str(uuid.uuid4())[:8]
     filename = secure_filename(file.filename)
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], f"{job_id}_{filename}")
     file.save(filepath)
     
-    # İşlem durumu oluştur
+    # Read file content for language detection
+    try:
+        with open(filepath, 'r', encoding='utf-8-sig') as f:
+            content = f.read()
+        # Get first 2000 chars for detection
+        sample_text = content[:2000]
+    except:
+        sample_text = ""
+    
+    # Detect language
+    manager = get_model_manager()
+    detected_lang, confidence = manager.detect_language(sample_text)
+    
+    # Check if we have a matching model
+    installed_models = manager.get_installed_models()
+    matching_model = next((m for m in installed_models if m.get('lang_code') == detected_lang), None)
+    has_matching_model = matching_model is not None
+    
+    # Determine which model will be used
+    if matching_model:
+        active_model_name = matching_model.get('model_name', '')
+        active_model_lang = matching_model.get('language_name', '')
+    elif installed_models:
+        # Fallback to first installed model
+        active_model_name = installed_models[0].get('model_name', 'en_core_web_sm')
+        active_model_lang = installed_models[0].get('language_name', 'English')
+    else:
+        active_model_name = 'sentencizer'
+        active_model_lang = 'Rule-based'
+    
+    # Create job status
     translation_jobs[job_id] = {
         'status': 'uploaded',
         'progress': 0,
         'filename': filename,
         'filepath': filepath,
         'output_path': None,
-        'error': None
+        'error': None,
+        'detected_lang': detected_lang,
+        'lang_confidence': confidence,
+        'has_matching_model': has_matching_model,
+        'warning': None
     }
+    
+    # Set warning if mismatch
+    if not has_matching_model and detected_lang != 'unknown':
+        translation_jobs[job_id]['warning'] = f"Detected {ALL_LANGUAGES.get(detected_lang, detected_lang)}, but using {active_model_name}"
     
     return jsonify({
         'job_id': job_id,
         'filename': filename,
-        'message': 'Dosya yüklendi'
+        'message': 'File uploaded',
+        'detected_lang': detected_lang,
+        'lang_name': ALL_LANGUAGES.get(detected_lang, detected_lang.upper()),
+        'confidence': confidence,
+        'has_matching_model': has_matching_model,
+        'active_model_name': active_model_name,
+        'active_model_lang': active_model_lang,
+        'warning': translation_jobs[job_id].get('warning')
     })
 
 
 @app.route('/translate', methods=['POST'])
 def start_translation():
-    """Çeviri işlemini başlat."""
+    """Start translation job."""
     data = request.get_json()
     job_id = data.get('job_id')
     target_lang = data.get('target_lang', 'TR')
     output_filename = data.get('output_filename', None)
     
     if job_id not in translation_jobs:
-        return jsonify({'error': 'Geçersiz iş ID'}), 400
+        return jsonify({'error': 'Invalid job ID'}), 400
     
     job = translation_jobs[job_id]
     
     if job['status'] not in ['uploaded', 'error']:
-        return jsonify({'error': 'Bu iş zaten işleniyor veya tamamlandı'}), 400
+        return jsonify({'error': 'Job already processing or completed'}), 400
     
-    # Çıktı dosya adı
+    # Output filename
     if not output_filename:
         base_name = Path(job['filename']).stem
         output_filename = f"{base_name}_{target_lang}.srt"
@@ -233,19 +425,22 @@ def start_translation():
     job['status'] = 'processing'
     job['progress'] = 0
     
-    # Arka planda çeviri başlat
+    # Use detected language for SpaCy model selection
+    source_lang = job.get('detected_lang', 'en')
+    
+    # Start translation in background
     thread = threading.Thread(
         target=run_translation,
-        args=(job_id, job['filepath'], output_path, target_lang)
+        args=(job_id, job['filepath'], output_path, source_lang, target_lang)
     )
     thread.daemon = True
     thread.start()
     
-    return jsonify({'message': 'Çeviri başladı', 'job_id': job_id})
+    return jsonify({'message': 'Translation started', 'job_id': job_id})
 
 
-def run_translation(job_id: str, input_path: str, output_path: str, target_lang: str):
-    """Çeviri işlemini arka planda çalıştır."""
+def run_translation(job_id: str, input_path: str, output_path: str, source_lang: str, target_lang: str):
+    """Run translation in background."""
     job = translation_jobs[job_id]
     
     try:
@@ -255,10 +450,14 @@ def run_translation(job_id: str, input_path: str, output_path: str, target_lang:
         blocks = parse_srt(input_path)
         job['progress'] = 10
         
-        # 2. Merge sentences (20%)
+        # 2. Merge sentences (20%) - Use ModelManager
         job['status'] = 'merging'
-        merged = merge_sentences(blocks)
+        merged, model_info, is_fallback = merge_sentences_with_manager(blocks, source_lang)
         job['progress'] = 20
+        
+        # Store model info
+        job['used_model'] = model_info
+        job['model_fallback'] = is_fallback
         
         # 3. Translate (20% -> 80%)
         job['status'] = 'translating'
@@ -269,7 +468,7 @@ def run_translation(job_id: str, input_path: str, output_path: str, target_lang:
         total_sentences = len(sentences_to_translate)
         translated_sentences = []
         
-        # Batch olarak çevir ama progress güncelle
+        # Batch translation
         batch_size = 10
         for i in range(0, total_sentences, batch_size):
             batch = sentences_to_translate[i:i+batch_size]
@@ -311,7 +510,7 @@ def run_translation(job_id: str, input_path: str, output_path: str, target_lang:
 
 @app.route('/progress/<job_id>')
 def get_progress(job_id):
-    """İşlem durumunu döndür (SSE stream)."""
+    """Return job progress (SSE stream)."""
     def generate():
         while True:
             if job_id not in translation_jobs:
@@ -322,7 +521,10 @@ def get_progress(job_id):
             data = {
                 'status': job['status'],
                 'progress': job['progress'],
-                'error': job.get('error')
+                'error': job.get('error'),
+                'warning': job.get('warning'),
+                'used_model': job.get('used_model'),
+                'model_fallback': job.get('model_fallback', False)
             }
             yield f"data: {json.dumps(data)}\n\n"
             
@@ -337,9 +539,9 @@ def get_progress(job_id):
 
 @app.route('/status/<job_id>')
 def get_status(job_id):
-    """İşlem durumunu JSON olarak döndür."""
+    """Return job status as JSON."""
     if job_id not in translation_jobs:
-        return jsonify({'error': 'İş bulunamadı'}), 404
+        return jsonify({'error': 'Job not found'}), 404
     
     job = translation_jobs[job_id]
     return jsonify({
@@ -347,20 +549,24 @@ def get_status(job_id):
         'progress': job['progress'],
         'filename': job.get('filename'),
         'output_filename': job.get('output_filename'),
-        'error': job.get('error')
+        'error': job.get('error'),
+        'warning': job.get('warning'),
+        'detected_lang': job.get('detected_lang'),
+        'used_model': job.get('used_model'),
+        'model_fallback': job.get('model_fallback', False)
     })
 
 
 @app.route('/download/<job_id>')
 def download_file(job_id):
-    """Çevrilmiş dosyayı indir."""
+    """Download translated file."""
     if job_id not in translation_jobs:
-        return jsonify({'error': 'İş bulunamadı'}), 404
+        return jsonify({'error': 'Job not found'}), 404
     
     job = translation_jobs[job_id]
     
     if job['status'] != 'completed':
-        return jsonify({'error': 'Çeviri henüz tamamlanmadı'}), 400
+        return jsonify({'error': 'Translation not completed'}), 400
     
     return send_file(
         job['output_path'],
@@ -369,18 +575,45 @@ def download_file(job_id):
     )
 
 
+# ============================================================
+# MAIN
+# ============================================================
+
 if __name__ == '__main__':
     import logging
-    # Flask ve Werkzeug loglarını sustur
+    import socket
+    
+    # Silence Flask/Werkzeug logs
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
+    
+    # Get LAN IP
+    def get_local_ip():
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            return "127.0.0.1"
+    
+    local_ip = get_local_ip()
+    manager = get_model_manager()
     
     print()
     print("  Smart SRT Translator")
     print("  " + "-" * 30)
-    print("  Adres: http://localhost:5000")
-    print("  Cikis: Ctrl+C")
+    print(f"  Local:   http://localhost:5000")
+    print(f"  Network: http://{local_ip}:5000")
+    
+    if not manager.is_setup_complete():
+        print(f"  Status:  ⚠️  Setup required")
+    else:
+        models = manager.get_installed_models()
+        print(f"  Models:  {len(models)} installed")
+    
+    print("  Exit:    Ctrl+C")
     print()
     
-    app.run(debug=False, host='127.0.0.1', port=5000)
-
+    app.run(debug=False, host='0.0.0.0', port=5000)

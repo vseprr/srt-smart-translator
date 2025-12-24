@@ -5,6 +5,7 @@ flask>=3.0.0
 pysrt>=1.1.2
 spacy>=3.7.0
 requests>=2.31.0
+langdetect>=1.0.9
 
-# Note: After installing, download the SpaCy English model:
-# python -m spacy download en_core_web_sm
+# Note: SpaCy language models are installed via the Setup Wizard
+# Run the app and follow the setup instructions

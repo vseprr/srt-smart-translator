@@ -31,7 +31,7 @@ def load_api_key_from_config() -> str:
 @dataclass
 class TranslationConfig:
     """Çeviri konfigürasyonu."""
-    source_lang: str = "EN"
+    source_lang: Optional[str] = None  # None = auto-detect (recommended)
     target_lang: str = "TR"
     formality: str = "default"  # "more", "less", "default", "prefer_more", "prefer_less"
     preserve_formatting: bool = True
@@ -79,11 +79,14 @@ class DeepLTranslator:
         payload = {
             "text": texts,
             "target_lang": config.target_lang,
-            "source_lang": config.source_lang,
             # IMPORTANT: split_sentences=0 → Cümle bölmeyi biz SpaCy ile yapıyoruz
             "split_sentences": "0",
             "preserve_formatting": config.preserve_formatting
         }
+        
+        # Only include source_lang if explicitly set (None = auto-detect)
+        if config.source_lang:
+            payload["source_lang"] = config.source_lang
         
         # Formality sadece desteklenen dillerde kullanılabilir
         # TR desteklemiyor, bu yüzden sadece destekleyenler için ekle

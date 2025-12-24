@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Smart SRT Translator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        .settings-container {
+            max-width: 650px;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover {
+            color: var(--accent-primary);
+        }
+
+        .back-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Installed Models List */
+        .model-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .model-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+
+        .model-item-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .model-lang-badge {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--accent-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .model-details h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .model-details span {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .btn-delete {
+            padding: 8px 14px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 6px;
+            color: var(--error);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-delete:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 32px;
+            color: var(--text-muted);
+        }
+
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 12px;
+            opacity: 0.4;
+        }
+
+        /* Add Model Section */
+        .add-model-section {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .add-model-section h3 {
+            font-size: 1rem;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .add-fields {
+            background: rgba(99, 102, 241, 0.05);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .text-input.invalid {
+            border-color: var(--error);
+        }
+
+        .text-input.valid {
+            border-color: var(--success);
+        }
+
+        .validation-message {
+            font-size: 0.75rem;
+            margin-top: 6px;
+        }
+
+        .validation-message.error {
+            color: var(--error);
+        }
+
+        .validation-message.hint {
+            color: var(--text-muted);
+        }
+
+        /* Progress Toast */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast.success {
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+
+        .toast.error {
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .toast-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .toast-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        .toast-icon.success {
+            color: var(--success);
+        }
+
+        .toast-icon.error {
+            color: var(--error);
+        }
+
+        /* Custom Confirm Modal */
+        .confirm-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .confirm-modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .confirm-modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 28px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .confirm-modal-overlay.show .confirm-modal {
+            transform: scale(1) translateY(0);
+        }
+
+        .confirm-modal-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 24px;
+        }
+
+        .confirm-modal-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .confirm-modal-message {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .confirm-modal-message strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .confirm-modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .confirm-modal-btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 100px;
+        }
+
+        .confirm-modal-btn.cancel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .confirm-modal-btn.cancel:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .confirm-modal-btn.danger {
+            background: var(--error);
+            border: 1px solid var(--error);
+            color: white;
+        }
+
+        .confirm-modal-btn.danger:hover {
+            background: #dc2626;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container settings-container">
+        <a href="/" class="back-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Back to Home
+        </a>
+
+        <header style="margin-bottom: 32px;">
+            <h1
+                style="font-size: 1.6rem; font-weight: 700; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                ⚙️ Settings</h1>
+        </header>
+
+        <main>
+            <!-- API Key Section -->
+            <section class="card api-section">
+                <h2>🔑 API Key</h2>
+
+                <div id="apiConfigured" style="display: none;">
+                    <div class="api-status">
+                        <span class="api-key-display" id="maskedKey"></span>
+                        <button class="btn-remove" id="removeApiKey">Remove</button>
+                    </div>
+                </div>
+
+                <div id="apiNotConfigured">
+                    <div class="form-group">
+                        <input type="password" id="apiKeyInput" class="text-input"
+                            placeholder="Enter your DeepL API key...">
+                    </div>
+                    <button class="btn-save" id="saveApiKey">Save</button>
+                </div>
+
+                <p class="api-note">Currently only DeepL API is supported.</p>
+            </section>
+
+            <!-- Installed Models Section -->
+            <section class="card">
+                <h2>🧠 Installed SpaCy Models</h2>
+
+                <div class="model-list" id="modelList">
+                    {% if models %}
+                    {% for model in models %}
+                    <div class="model-item" data-model="{{ model.model_name }}">
+                        <div class="model-item-info">
+                            <div class="model-lang-badge">{{ model.lang_code[:2] }}</div>
+                            <div class="model-details">
+                                <h4>{{ model.language_name }}</h4>
+                                <span>{{ model.model_name }}</span>
+                            </div>
+                        </div>
+                        <button class="btn-delete" onclick="removeModel('{{ model.model_name }}')">Remove</button>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p>No models installed yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Add New Model -->
+                <div class="add-model-section">
+                    <h3>➕ Add New Model</h3>
+
+                    <div class="add-fields">
+                        <div class="form-group">
+                            <label for="addLang">Language</label>
+                            <select id="addLang" class="select-input">
+                                <option value="">Select a language...</option>
+                                {% for code, name in all_languages.items() %}
+                                <option value="{{ code }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="addCmd">Install Command or URL</label>
+                            <input type="text" id="addCmd" class="text-input"
+                                placeholder="pip install https://... or python -m spacy download xx_model">
+                            <p class="validation-message hint" id="cmdHint">Supports: pip install, spacy download, or
+                                direct wheel
+                                URLs</p>
+                        </div>
+
+                        <button class="btn-save" id="addModelBtn" disabled style="margin-top: 16px;">
+                            <span id="addBtnText">Add Model</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Smart SRT Translator - Settings</p>
+        </footer>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <div class="toast-spinner" id="toastSpinner"></div>
+        <svg class="toast-icon success" id="toastSuccess" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" style="display: none;">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+        <svg class="toast-icon error" id="toastError" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" style="display: none;">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+        </svg>
+        <span id="toastMessage">Installing model...</span>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div class="confirm-modal-overlay" id="confirmModal">
+        <div class="confirm-modal">
+            <div class="confirm-modal-icon">🗑️</div>
+            <h3 class="confirm-modal-title">Remove Model</h3>
+            <p class="confirm-modal-message">
+                Are you sure you want to remove <strong id="confirmModelName"></strong>?
+                <br><small style="color: var(--text-muted);">This will uninstall the model from your
+                    environment.</small>
+            </p>
+            <div class="confirm-modal-buttons">
+                <button class="confirm-modal-btn cancel" id="confirmCancel">Cancel</button>
+                <button class="confirm-modal-btn danger" id="confirmRemove">Remove</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Key Management
+        const apiConfigured = document.getElementById('apiConfigured');
+        const apiNotConfigured = document.getElementById('apiNotConfigured');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const saveApiKeyBtn = document.getElementById('saveApiKey');
+        const removeApiKeyBtn = document.getElementById('removeApiKey');
+        const maskedKeySpan = document.getElementById('maskedKey');
+
+        async function loadApiConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const data = await response.json();
+
+                if (data.has_api_key) {
+                    apiConfigured.style.display = 'block';
+                    apiNotConfigured.style.display = 'none';
+                    maskedKeySpan.textContent = data.masked_key;
+                } else {
+                    apiConfigured.style.display = 'none';
+                    apiNotConfigured.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Config load error:', error);
+            }
+        }
+
+        saveApiKeyBtn.addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) return;
+
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: apiKey })
+                });
+
+                if (response.ok) {
+                    apiKeyInput.value = '';
+                    loadApiConfig();
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+            }
+        });
+
+        removeApiKeyBtn.addEventListener('click', async () => {
+            if (!confirm('Remove API key?')) return;
+
+            try {
+                await fetch('/api/config', { method: 'DELETE' });
+                loadApiConfig();
+            } catch (error) {
+                console.error('Remove error:', error);
+            }
+        });
+
+        loadApiConfig();
+
+        // Add Model
+        const addLang = document.getElementById('addLang');
+        const addCmd = document.getElementById('addCmd');
+        const addModelBtn = document.getElementById('addModelBtn');
+        const addBtnText = document.getElementById('addBtnText');
+
+        addCmd.addEventListener('input', validateAddFields);
+        addLang.addEventListener('change', validateAddFields);
+
+        // Extract model name from command/URL
+        function extractModelName(cmd) {
+            // Try spacy download pattern: spacy download xx_model_name
+            let match = cmd.match(/spacy\s+download\s+([a-z]{2,3}_[a-z_]+)/i);
+            if (match) return match[1];
+
+            // Try wheel URL pattern: /model_name-version-py3-none-any.whl
+            match = cmd.match(/\/([a-z]{2,3}_[a-z_]+[a-z0-9_]*)-[\d\.]+[^\/]*\.whl/i);
+            if (match) return match[1];
+
+            // Try simpler wheel pattern: /model_name-1.0-py3-none-any.whl
+            match = cmd.match(/\/([a-z]{2,3}_core[a-z_]+)-/i);
+            if (match) return match[1];
+
+            // Try pip install package name
+            match = cmd.match(/pip\s+install\s+([a-z]{2,3}_[a-z_]+)/i);
+            if (match) return match[1];
+
+            return null;
+        }
+
+        function validateAddFields() {
+            const cmd = addCmd.value.trim();
+            const lang = addLang.value;
+            const cmdHint = document.getElementById('cmdHint');
+
+            let isValid = true;
+            let errorMsg = '';
+
+            // Check if command contains spacy, pip, or is a URL
+            const cmdLower = cmd.toLowerCase();
+            const hasSpacy = cmdLower.includes('spacy');
+            const hasPip = cmdLower.includes('pip');
+            const isUrl = cmdLower.startsWith('http://') || cmdLower.startsWith('https://');
+
+            if (!cmd) {
+                isValid = false;
+            } else if (!hasSpacy && !hasPip && !isUrl) {
+                isValid = false;
+                errorMsg = 'Command must contain "spacy", "pip", or be a URL';
+            }
+
+            // Block dangerous patterns
+            if (cmd && /[&;|$`<>]/.test(cmd)) {
+                isValid = false;
+                errorMsg = 'Shell operators not allowed';
+            }
+
+            // Check for multiple models in one command (e.g., "spacy download en_core_web_sm fr_core_news_sm")
+            if (cmd && hasSpacy) {
+                const modelMatches = cmd.match(/[a-z]{2,3}_[a-z]+_[a-z]+/gi);
+                if (modelMatches && modelMatches.length > 1) {
+                    isValid = false;
+                    errorMsg = `Multiple models detected (${modelMatches.join(', ')}). Install one at a time.`;
+                }
+            }
+
+            // Need language selected
+            if (!lang) {
+                isValid = false;
+            }
+
+            // Show/hide error message
+            if (cmdHint) {
+                if (errorMsg) {
+                    cmdHint.textContent = errorMsg;
+                    cmdHint.style.color = 'var(--error)';
+                } else {
+                    cmdHint.textContent = 'Supports: pip install, spacy download, or direct wheel URLs.';
+                    cmdHint.style.color = 'var(--text-muted)';
+                }
+            }
+
+            addModelBtn.disabled = !isValid;
+        }
+
+        addModelBtn.addEventListener('click', async () => {
+            const cmd = addCmd.value.trim();
+            const lang = addLang.value;
+
+            // Try to extract model name, or generate one
+            let modelName = extractModelName(cmd);
+            if (!modelName) {
+                // Generate a fallback name based on language
+                modelName = lang + '_custom_model';
+            }
+
+            showToast('Installing model... This may take a few minutes.', 'loading');
+
+            try {
+                const response = await fetch('/api/install-model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        install_cmd: cmd,
+                        model_name: modelName,
+                        lang_code: lang
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('Model installed successfully!', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast(data.error || 'Installation failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        });
+
+        // Remove Model - Custom Modal
+        const confirmModal = document.getElementById('confirmModal');
+        const confirmModelName = document.getElementById('confirmModelName');
+        const confirmCancel = document.getElementById('confirmCancel');
+        const confirmRemove = document.getElementById('confirmRemove');
+        let pendingRemoveModel = null;
+
+        function removeModel(modelName) {
+            pendingRemoveModel = modelName;
+            confirmModelName.textContent = modelName;
+            confirmModal.classList.add('show');
+        }
+
+        confirmCancel.addEventListener('click', () => {
+            confirmModal.classList.remove('show');
+            pendingRemoveModel = null;
+        });
+
+        // Close modal on overlay click
+        confirmModal.addEventListener('click', (e) => {
+            if (e.target === confirmModal) {
+                confirmModal.classList.remove('show');
+                pendingRemoveModel = null;
+            }
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && confirmModal.classList.contains('show')) {
+                confirmModal.classList.remove('show');
+                pendingRemoveModel = null;
+            }
+        });
+
+        confirmRemove.addEventListener('click', async () => {
+            if (!pendingRemoveModel) return;
+
+            const modelName = pendingRemoveModel;
+            confirmModal.classList.remove('show');
+            showToast('Removing model...', 'loading');
+
+            try {
+                const response = await fetch('/api/remove-model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_name: modelName })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Model removed successfully!', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast(data.error || 'Remove failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+
+            pendingRemoveModel = null;
+        });
+
+        // Toast
+        const toast = document.getElementById('toast');
+        const toastSpinner = document.getElementById('toastSpinner');
+        const toastSuccess = document.getElementById('toastSuccess');
+        const toastError = document.getElementById('toastError');
+        const toastMessage = document.getElementById('toastMessage');
+
+        function showToast(message, type) {
+            toastMessage.textContent = message;
+
+            toastSpinner.style.display = type === 'loading' ? 'block' : 'none';
+            toastSuccess.style.display = type === 'success' ? 'block' : 'none';
+            toastError.style.display = type === 'error' ? 'block' : 'none';
+
+            toast.classList.remove('success', 'error');
+            if (type !== 'loading') {
+                toast.classList.add(type);
+            }
+
+            toast.classList.add('show');
+
+            if (type !== 'loading') {
+                setTimeout(() => toast.classList.remove('show'), 4000);
+            }
+        }
+    </script>
+</body>
+
+</html>

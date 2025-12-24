@@ -1,0 +1,9 @@
+{
+  "models": [
+    {
+      "lang_code": "tr",
+      "model_name": "tr_core_news_lg",
+      "language_name": "Turkish"
+    }
+  ]
+}

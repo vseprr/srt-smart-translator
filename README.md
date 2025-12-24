@@ -10,7 +10,6 @@
 
 <p align="center">
   <a href="#features">Features</a> •
-  <a href="#demo">Demo</a> •
   <a href="#the-problem">The Problem</a> •
   <a href="#how-it-works">How It Works</a> •
   <a href="#installation">Installation</a> •
@@ -30,36 +29,27 @@
 - 🎨 **Modern Web UI** – Dark glassmorphism theme with drag-and-drop file upload
 - 📊 **Real-time Progress** – Server-Sent Events (SSE) for live translation status updates
 - 🔐 **Secure** – API keys stored locally, never transmitted to third parties
+- 🛠️ **Multi-Model Support** – Install multiple SpaCy language models for different source languages
+- 🔍 **Auto Language Detection** – Automatically detects source file language
+- ⚠️ **Smart Warnings** – Alerts for language mismatches and same language selections
 
 ---
 
-## 🎥 Demo
+## 🎯 The Problem: Why Context Matters?
 
-<p align="center">
-  <img src="assets/demo.gif" alt="Smart SRT Translator Demo" width="700"/>
-</p>
+### Turkish → English Example
 
----
+Turkish sentence structure places the verb at the end. When subtitles split a sentence into multiple lines, standard translators fail to capture the meaning of the first line because the action (verb) is missing until the end.
 
-## 🎯 The Problem
+**Original (Split in 3 lines):**
+> 1. Bütün bu olanlardan
+> 2. sonra, beni affetmeni
+> 3. beklemiyorum.
 
-Traditional subtitle translators process each subtitle block independently:
-
-```
-1
-00:00:01,000 --> 00:00:03,000
-I went to the store
-
-2
-00:00:03,001 --> 00:00:05,000
-and bought some milk.
-```
-
-**Block-by-block translation result:** ❌
-```
-1: "Mağazaya gittim"
-2: "ve biraz süt satın aldı."  ← Wrong conjugation, lost context!
-```
+| Method | Output (Subtitle) | Why it fails/succeeds? |
+| :--- | :--- | :--- |
+| **Standard (Line-by-Line)** | 1. From all these things<br>2. after, to forgive me<br>3. **I am not waiting.** | ❌ **FAIL:** "Beklemiyorum" is translated as "waiting" physically, instead of "expecting". The sentence is broken and meaningless. |
+| **SRT Smart Translator** | 1. After all that has happened,<br>2. I do not expect<br>3. you to forgive me. | ✅ **SUCCESS:** It merges lines, understands "affetmeni beklemiyorum" implies expectation, translates correctly, and re-splits by timing. |
 
 ---
 
@@ -78,30 +68,13 @@ Smart SRT Translator uses a 4-step pipeline:
 Reads the SRT file with UTF-8 BOM support using `pysrt`
 
 ### 2. Merge
-SpaCy NLP detects sentence boundaries and merges split sentences:
-```
-"I went to the store" + "and bought some milk." 
-→ "I went to the store and bought some milk."
-```
+SpaCy NLP detects sentence boundaries and merges split sentences
 
 ### 3. Translate
-Complete sentences are sent to DeepL API for contextual translation:
-```
-→ "Mağazaya gittim ve biraz süt aldım."
-```
+Complete sentences are sent to DeepL API for contextual translation
 
 ### 4. Smart Split
-Translation is proportionally split back to original block structure using character ratios:
-```
-Original: [40% chars] [60% chars]
-Translation: [40% of chars] [60% of chars]
-```
-
-**Result:** ✅
-```
-1: "Mağazaya gittim"
-2: "ve biraz süt aldım."
-```
+Translation is proportionally split back to original block structure using character ratios
 
 ---
 
@@ -109,111 +82,68 @@ Translation: [40% of chars] [60% of chars]
 
 ### Prerequisites
 
-#### 1. Python 3.8 or higher
-If you don't have Python installed:
-- **Windows:** Download from [python.org](https://www.python.org/downloads/) and run the installer
-  - ⚠️ **Important:** Check "Add Python to PATH" during installation!
-- **macOS:** `brew install python` or download from python.org
-- **Linux:** `sudo apt install python3 python3-pip python3-venv`
+- **Python 3.8+** – [Download from python.org](https://www.python.org/downloads/)
+  - ⚠️ Check "Add Python to PATH" during installation!
+- **DeepL API Key** – [Get free API key](https://www.deepl.com/pro-api)
 
-Verify installation:
+### Quick Start
+
 ```bash
-python --version  # Should show Python 3.8+
-```
-
-#### 2. DeepL API Key (Free)
-1. Go to [DeepL API](https://www.deepl.com/pro-api)
-2. Click "Sign up for free"
-3. Register with your email
-4. Go to your [Account Settings](https://www.deepl.com/account/summary)
-5. Copy your **Authentication Key** (starts with something like `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx`)
-
----
-
-### Step-by-Step Setup
-
-#### 1. Clone or Download the Repository
-```bash
-# Option A: Clone with Git
+# 1. Clone repository
 git clone https://github.com/vseprr/srt-smart-translator.git
 cd srt-smart-translator
 
-# Option B: Download ZIP from GitHub and extract it
-```
-
-#### 2. Create a Virtual Environment (Recommended)
-```bash
-# Create virtual environment
+# 2. Create virtual environment
 python -m venv venv
 
-# Activate it
-# On Windows (Command Prompt):
-venv\Scripts\activate
-
-# On Windows (PowerShell):
+# 3. Activate virtual environment
+# Windows (PowerShell):
 .\venv\Scripts\Activate.ps1
-
-# On macOS/Linux:
+# Windows (CMD):
+venv\Scripts\activate
+# macOS/Linux:
 source venv/bin/activate
-```
 
-You should see `(venv)` in your terminal prompt when activated.
-
-#### 3. Install Dependencies
-```bash
+# 4. Install dependencies
 pip install -r requirements.txt
-```
 
-#### 4. Download SpaCy Language Model
-```bash
-python -m spacy download en_core_web_sm
-```
-
-This downloads the English NLP model (~12MB) for sentence detection.
-
-#### 5. Run the Application
-```bash
+# 5. Start the application
 python app.py
 ```
 
-You should see:
-```
-  Smart SRT Translator
-  ------------------------------
-  Adres: http://localhost:5000
-  Cikis: Ctrl+C
-```
+### First Run
 
-#### 6. Open in Browser
-Navigate to **http://localhost:5000** and enter your DeepL API key.
-
-#### 7. Test with Sample File
-A sample file `example.srt` is included for testing. It contains split sentences to demonstrate the smart merging feature.
-
----
+1. Open **http://localhost:5000** in your browser
+2. You'll see the **Setup Wizard** 🧙‍♂️
+3. Select one or more language models to install:
+   - 🇬🇧 English (en_core_web_sm)
+   - 🇹🇷 Turkish (tr_core_news_lg)
+   - 🇪🇸 Spanish (es_core_news_sm)
+   - 🇫🇷 French (fr_core_news_sm)
+   - 🇩🇪 German (de_core_news_sm)
+   - ➕ Custom (install from URL)
+4. Wait for installation to complete
+5. Enter your DeepL API key in Settings
+6. Start translating! 🎉
 
 ### Windows Quick Launch
-After initial setup, just double-click `UI-Start.bat` to launch the application.
+
+After initial setup, double-click `UI-Start.bat` to launch.
 
 ---
 
 ## 🚀 Usage
 
-1. **Start the server**
-   ```bash
-   python app.py
-   ```
+1. **Start the server:** `python app.py`
+2. **Open browser:** http://localhost:5000
+3. **Upload SRT file** via drag-and-drop
+4. **Select target language** and click "Start Translation"
+5. **Download** the translated file when complete
 
-2. **Open your browser**
-   Navigate to `http://localhost:5000`
+### Warnings System
 
-3. **Enter your DeepL API key** (first time only)
-
-4. **Upload an SRT file** via drag-and-drop
-
-5. **Select target language** and click "Start Translation"
-
-6. **Download** the translated file when complete
+- ⚠️ **Language Mismatch** – Shows when no SpaCy model is installed for detected language
+- ⚠️ **Same Language** – Warns when source and target languages are the same
 
 ---
 
@@ -221,20 +151,36 @@ After initial setup, just double-click `UI-Start.bat` to launch the application.
 
 ```
 srt-smart-translator/
-├── app.py              # Flask server + API endpoints
-├── parser.py           # SRT file reading/writing
-├── engine.py           # Sentence merging algorithm
-├── translator.py       # DeepL API integration
-├── main.py             # CLI interface (optional)
-├── config.json         # API key storage (gitignored)
+├── app.py                    # Flask server + API endpoints
+├── parser.py                 # SRT file reading/writing
+├── engine.py                 # Sentence merging algorithm  
+├── translator.py             # DeepL API integration
+├── requirements.txt          # Python dependencies
+├── UI-Start.bat              # Windows quick launcher
+├── backend/
+│   ├── model_manager.py      # SpaCy model management
+│   └── language_data.py      # Language configurations
 ├── templates/
-│   └── index.html      # Web UI with inline SVG logo
+│   ├── index.html            # Main translation page
+│   ├── setup.html            # First-run setup wizard
+│   └── settings.html         # Settings & model management
 ├── static/
-│   └── style.css       # Dark glassmorphism theme
-├── uploads/            # Temporary upload storage
-├── outputs/            # Translated files
-└── memory/             # Project documentation
+│   └── style.css             # Dark glassmorphism theme
+├── uploads/                  # Temporary upload storage
+└── outputs/                  # Translated files
 ```
+
+---
+
+## ⚙️ Settings Page Features
+
+- **API Key Management** – Save/remove DeepL API key
+- **Installed Models** – View all installed SpaCy models
+- **Remove Model** – Uninstalls model with `pip uninstall`
+- **Add Model** – Install via:
+  - `python -m spacy download xx_model`
+  - `pip install https://...whl`
+  - Direct wheel URL
 
 ---
 
@@ -243,10 +189,13 @@ srt-smart-translator/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/` | Main page (HTML) |
-| `GET` | `/languages` | List of supported languages |
+| `GET` | `/setup` | Setup wizard (if no models) |
+| `GET` | `/settings` | Settings page |
 | `GET` | `/api/config` | Check API key status |
 | `POST` | `/api/config` | Save API key |
 | `DELETE` | `/api/config` | Remove API key |
+| `POST` | `/api/install-model` | Install SpaCy model |
+| `POST` | `/api/remove-model` | Uninstall SpaCy model |
 | `POST` | `/upload` | Upload SRT file |
 | `POST` | `/translate` | Start translation job |
 | `GET` | `/status/{job_id}` | Translation status (JSON) |
@@ -260,7 +209,8 @@ srt-smart-translator/
 | Component | Technology |
 |-----------|------------|
 | Backend | Flask 3.x |
-| NLP | SpaCy (en_core_web_sm) |
+| NLP | SpaCy (multiple models) |
+| Language Detection | langdetect |
 | Translation | DeepL Free API |
 | SRT Parsing | pysrt |
 | Frontend | Vanilla HTML/CSS/JS |
@@ -268,20 +218,22 @@ srt-smart-translator/
 
 ---
 
-## ⚠️ Limitations
+## ⚠️ Known Limitations
 
 - **Single file only** – No batch translation yet
 - **SRT format only** – VTT, ASS not supported
-- **English source** – Assumes EN source language by default
 - **Internet required** – DeepL API needs connectivity
 
 ---
 
 ## 🗺️ Roadmap
 
+- [x] ~~Multi-language SpaCy model support~~
+- [x] ~~Automatic source language detection~~
+- [x] ~~First-run setup wizard~~
+- [x] ~~Real pip uninstall for models~~
 - [ ] Batch file translation
 - [ ] VTT/ASS format support
-- [ ] Automatic source language detection
 - [ ] Formality selection (formal/informal)
 - [ ] Translation history
 - [ ] PWA support for offline UI
@@ -311,6 +263,7 @@ This project is open source and available under the [MIT License](LICENSE).
 - [DeepL](https://www.deepl.com/) for their excellent translation API
 - [SpaCy](https://spacy.io/) for natural language processing
 - [pysrt](https://github.com/byroot/pysrt) for SRT file handling
+- [Turkish NLP Suite](https://huggingface.co/turkish-nlp-suite) for Turkish SpaCy model
 
 ---
 

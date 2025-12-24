@@ -190,7 +190,67 @@
 
             <!-- Settings Section -->
             <section class="card settings-section">
-                <h2>Çeviri Ayarları</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h2 style="margin-bottom: 0;">Çeviri Ayarları</h2>
+                    <a href="/settings"
+                        style="color: var(--text-secondary); font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 6px;"
+                        title="Settings">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+                        </svg>
+                        Settings
+                    </a>
+                </div>
+
+                <!-- Active Model Badge (dynamic - updates after file upload) -->
+                <div id="activeModelBadge"
+                    style="margin-bottom: 16px; padding: 10px 14px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">Active Model:</span>
+                    <span id="activeModelName"
+                        style="font-size: 0.85rem; font-weight: 600; color: var(--accent-primary);">{% if active_model
+                        %}{{ active_model.model_name }}{% else %}Waiting for file...{% endif %}</span>
+                    <span id="activeModelLang" style="font-size: 0.75rem; color: var(--text-muted);">{% if active_model
+                        %}({{ active_model.language_name }}){% endif %}</span>
+                </div>
+
+                <!-- Language Mismatch Warning (hidden by default, shown via JS) -->
+                <div id="languageWarning"
+                    style="display: none; margin-bottom: 16px; padding: 12px 16px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px;">
+                    <div style="display: flex; align-items: flex-start; gap: 10px;">
+                        <span style="color: var(--error); font-size: 1.1rem;">⚠️</span>
+                        <div>
+                            <div style="font-size: 0.85rem; font-weight: 600; color: var(--error); margin-bottom: 4px;">
+                                Language Mismatch</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);" id="warningMessage"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detected Language Info (shown after upload) -->
+                <div id="detectedLangInfo"
+                    style="display: none; margin-bottom: 16px; padding: 10px 14px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 8px;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">Detected:</span>
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--success);"
+                        id="detectedLangText"></span>
+                </div>
+
+                <!-- Same Language Warning (hidden by default) -->
+                <div id="sameLangWarning"
+                    style="display: none; margin-bottom: 16px; padding: 12px 16px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px;">
+                    <div style="display: flex; align-items: flex-start; gap: 10px;">
+                        <span style="color: #f59e0b; font-size: 1.1rem;">⚠️</span>
+                        <div>
+                            <div style="font-size: 0.85rem; font-weight: 600; color: #f59e0b; margin-bottom: 4px;">
+                                Same Language Selected</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);" id="sameLangMessage">
+                                Source and target languages are the same. Translation may not be meaningful.
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="form-group">
                     <label for="targetLang">Hedef Dil</label>
@@ -316,6 +376,10 @@
         const statusDot = document.getElementById('statusDot');
         const targetLang = document.getElementById('targetLang');
         const outputFilename = document.getElementById('outputFilename');
+        const languageWarning = document.getElementById('languageWarning');
+        const warningMessage = document.getElementById('warningMessage');
+        const detectedLangInfo = document.getElementById('detectedLangInfo');
+        const detectedLangText = document.getElementById('detectedLangText');
 
         // API Config Elements
         const apiConfigured = document.getElementById('apiConfigured');
@@ -502,6 +566,9 @@
                 if (response.ok) {
                     currentJobId = data.job_id;
                     translateBtn.disabled = false;
+
+                    // Update Active Model badge based on detected language
+                    updateActiveModelBadge(data);
                 } else {
                     showAlert(data.error);
                     resetUpload();
@@ -552,8 +619,83 @@
             return name;
         }
 
-        // Target language change - update filename
-        targetLang.addEventListener('change', updateOutputFilename);
+        // Update Active Model Badge dynamically based on detected language
+        let currentDetectedLang = null; // Store detected lang for comparison
+
+        function updateActiveModelBadge(uploadData) {
+            const activeModelName = document.getElementById('activeModelName');
+            const activeModelLang = document.getElementById('activeModelLang');
+            const activeModelBadge = document.getElementById('activeModelBadge');
+
+            if (!activeModelName || !activeModelLang || !activeModelBadge) return;
+
+            // Store detected language for same-language check
+            currentDetectedLang = uploadData.detected_lang;
+
+            // Show detected language info
+            if (uploadData.detected_lang && uploadData.detected_lang !== 'unknown') {
+                detectedLangInfo.style.display = 'block';
+                detectedLangText.textContent = uploadData.lang_name;
+            } else {
+                detectedLangInfo.style.display = 'none';
+            }
+
+            // Check if we have a matching model for the detected language
+            if (uploadData.has_matching_model) {
+                // We have a model for this language - show it as active
+                activeModelBadge.style.background = 'rgba(34, 197, 94, 0.1)';
+                activeModelBadge.style.border = '1px solid rgba(34, 197, 94, 0.3)';
+                activeModelName.style.color = 'var(--success)';
+                activeModelName.textContent = uploadData.active_model_name || uploadData.lang_name + ' model';
+                activeModelLang.textContent = '(' + uploadData.lang_name + ')';
+                languageWarning.style.display = 'none';
+            } else if (uploadData.detected_lang && uploadData.detected_lang !== 'unknown') {
+                // No matching model - show warning and fallback
+                activeModelBadge.style.background = 'rgba(245, 158, 11, 0.1)';
+                activeModelBadge.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+                activeModelName.style.color = '#f59e0b';
+                activeModelName.textContent = 'Fallback: ' + (uploadData.active_model_name || 'en_core_web_sm');
+                activeModelLang.textContent = '(' + (uploadData.active_model_lang || 'English') + ' - Default)';
+
+                // Show warning message
+                languageWarning.style.display = 'block';
+                warningMessage.textContent = `Detected ${uploadData.lang_name}, but no SpaCy model installed for this language. Using ${uploadData.active_model_name || 'English model'} as fallback. You can install the correct model from Settings.`;
+            }
+
+            // Check for same language warning
+            checkSameLanguage();
+        }
+
+        // Check if source and target languages are the same
+        const sameLangWarning = document.getElementById('sameLangWarning');
+        const sameLangMessage = document.getElementById('sameLangMessage');
+
+        function checkSameLanguage() {
+            if (!currentDetectedLang || currentDetectedLang === 'unknown') {
+                sameLangWarning.style.display = 'none';
+                return;
+            }
+
+            const targetLangCode = targetLang.value.toLowerCase();
+            const detectedLangCode = currentDetectedLang.toLowerCase();
+
+            // Compare languages (handle cases like TR vs tr, EN vs en)
+            if (targetLangCode === detectedLangCode ||
+                targetLangCode.startsWith(detectedLangCode) ||
+                detectedLangCode.startsWith(targetLangCode)) {
+                sameLangWarning.style.display = 'block';
+                const langName = detectedLangText.textContent || currentDetectedLang.toUpperCase();
+                sameLangMessage.textContent = `Source file is in ${langName} and target is also ${langName}. Translation will have no effect.`;
+            } else {
+                sameLangWarning.style.display = 'none';
+            }
+        }
+
+        // Check same language when target language changes
+        targetLang.addEventListener('change', () => {
+            updateOutputFilename();
+            checkSameLanguage();
+        });
 
         // Start Translation (always re-upload to get fresh job)
         translateBtn.addEventListener('click', async () => {
@@ -596,7 +738,21 @@
                 const uploadData = await uploadResponse.json();
                 currentJobId = uploadData.job_id;
 
-                // Start translation
+                // Show detected language info
+                if (uploadData.detected_lang && uploadData.detected_lang !== 'unknown') {
+                    detectedLangInfo.style.display = 'block';
+                    detectedLangText.textContent = uploadData.lang_name;
+                }
+
+                // Show warning if language mismatch
+                if (uploadData.warning) {
+                    languageWarning.style.display = 'block';
+                    warningMessage.textContent = uploadData.warning;
+                } else {
+                    languageWarning.style.display = 'none';
+                }
+
+                // Start translation (source_lang auto-detected on server)
                 const response = await fetch('/translate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

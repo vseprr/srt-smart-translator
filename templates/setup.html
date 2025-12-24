@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initial Setup - Smart SRT Translator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        /* Setup-specific styles */
+        .setup-container {
+            max-width: 650px;
+        }
+
+        .setup-header {
+            margin-bottom: 32px;
+        }
+
+        .setup-header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .setup-header p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Radio Options */
+        .model-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .model-option {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .model-option:hover {
+            border-color: var(--accent-primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .model-option.selected {
+            border-color: var(--success);
+            background: rgba(34, 197, 94, 0.1);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+        }
+
+        .model-option.disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        /* Hide native checkbox */
+        .model-option input[type="checkbox"] {
+            display: none;
+        }
+
+        /* Custom round indicator */
+        .model-option .custom-indicator {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            background: transparent;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .model-option:hover .custom-indicator {
+            border-color: var(--accent-primary);
+        }
+
+        .model-option.selected .custom-indicator {
+            background: var(--success);
+            border-color: var(--success);
+        }
+
+        .model-option.selected .custom-indicator::after {
+            content: "✓";
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .model-option-content {
+            flex: 1;
+        }
+
+        .model-option-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .model-option-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .model-option-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-speed {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--success);
+        }
+
+        .badge-accuracy {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+        }
+
+        .badge-advanced {
+            background: rgba(139, 92, 246, 0.15);
+            color: var(--accent-secondary);
+        }
+
+        /* Custom Section */
+        .custom-section {
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: all 0.4s ease;
+        }
+
+        .custom-section.show {
+            max-height: 500px;
+            opacity: 1;
+            margin-top: 20px;
+        }
+
+        .custom-fields {
+            background: rgba(139, 92, 246, 0.05);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .custom-fields h3 {
+            font-size: 0.9rem;
+            color: var(--accent-secondary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .custom-fields h3::before {
+            content: "⚙️";
+        }
+
+        /* Input validation */
+        .text-input.invalid {
+            border-color: var(--error);
+        }
+
+        .text-input.valid {
+            border-color: var(--success);
+        }
+
+        .validation-message {
+            font-size: 0.75rem;
+            margin-top: 6px;
+            display: none;
+        }
+
+        .validation-message.error {
+            color: var(--error);
+            display: block;
+        }
+
+        .validation-message.hint {
+            color: var(--text-muted);
+            display: block;
+        }
+
+        /* Progress Overlay */
+        .progress-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .progress-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .progress-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 24px;
+        }
+
+        .progress-overlay h2 {
+            color: var(--text-primary);
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+        }
+
+        .progress-overlay p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .install-log {
+            margin-top: 20px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            max-width: 500px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container setup-container">
+        <header class="setup-header">
+            <h1>🚀 Initial Setup</h1>
+            <p>Configure your preferred language model for sentence boundary detection.</p>
+        </header>
+
+        <main>
+            <section class="card">
+                <h2>Select SpaCy Models to Install</h2>
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 20px;">
+                    SpaCy is used for intelligent sentence splitting. Select one or more models for your languages.
+                    <br><small style="color: var(--text-muted);">Click a selected box to deselect. Click outside to
+                        clear all.</small>
+                </p>
+
+                <div class="model-options" id="modelOptions">
+                    {% for model in preset_models %}
+                    <label class="model-option preset-model" data-model="{{ model.id }}">
+                        <input type="checkbox" name="presetModels" value="{{ model.id }}"
+                            data-cmd="{{ model.install_cmd }}" data-model-name="{{ model.model_name }}">
+                        <span class="custom-indicator"></span>
+                        <div class="model-option-content">
+                            <div class="model-option-name">{{ model.name }}</div>
+                            <div class="model-option-meta">{{ model.model_name }}</div>
+                        </div>
+                        <span class="model-option-badge badge-speed">{{ model.optimization }}</span>
+                    </label>
+                    {% endfor %}
+
+                    <!-- Custom Option (Additive) -->
+                    <label class="model-option" data-model="custom" id="customOption">
+                        <input type="checkbox" id="customCheckbox">
+                        <span class="custom-indicator"></span>
+                        <div class="model-option-content">
+                            <div class="model-option-name">+ Add Custom Model</div>
+                            <div class="model-option-meta">Install from URL or command (Hugging Face, etc.)</div>
+                        </div>
+                        <span class="model-option-badge badge-advanced">Advanced</span>
+                    </label>
+                </div>
+
+                <!-- Custom Section (Hidden by default) -->
+                <div class="custom-section" id="customSection">
+                    <div class="custom-fields">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h3 style="margin-bottom: 0;">Custom Model Configuration</h3>
+                            <button type="button" id="cancelCustomBtn"
+                                style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; padding: 4px 8px;"
+                                title="Cancel">✕</button>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="customLang">Language</label>
+                            <select id="customLang" class="select-input">
+                                <option value="">Select a language...</option>
+                                {% for code, name in all_languages.items() %}
+                                <option value="{{ code }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="installCmd">Install Command or URL</label>
+                            <input type="text" id="installCmd" class="text-input"
+                                placeholder="pip install https://... or python -m spacy download xx_model">
+                            <p class="validation-message" id="cmdValidation"></p>
+                            <p class="validation-message hint">Supports: pip install, spacy download, or direct wheel
+                                URLs from Hugging Face etc.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <button class="btn-primary" id="installBtn" disabled>
+                <span class="btn-text">Install Selected Model</span>
+                <span class="btn-loader" style="display: none;"></span>
+            </button>
+        </main>
+
+        <footer>
+            <p>Smart SRT Translator - First-time setup</p>
+        </footer>
+    </div>
+
+    <!-- Progress Overlay -->
+    <div class="progress-overlay" id="progressOverlay">
+        <div class="progress-spinner"></div>
+        <h2>Downloading Language Model</h2>
+        <p>Please wait, this may take a few minutes...</p>
+        <div class="install-log" id="installLog">Initializing...</div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const presetModels = document.querySelectorAll('.preset-model');
+        const customOption = document.getElementById('customOption');
+        const customCheckbox = document.getElementById('customCheckbox');
+        const customSection = document.getElementById('customSection');
+        const installBtn = document.getElementById('installBtn');
+        const installCmdInput = document.getElementById('installCmd');
+        const customLangSelect = document.getElementById('customLang');
+        const progressOverlay = document.getElementById('progressOverlay');
+        const installLog = document.getElementById('installLog');
+        const cmdValidation = document.getElementById('cmdValidation');
+        const cancelCustomBtn = document.getElementById('cancelCustomBtn');
+
+        // State
+        let selectedPresets = new Set();
+        let customSelected = false;
+
+        // Extract model name from command/URL
+        function extractModelName(cmd) {
+            let match = cmd.match(/spacy\s+download\s+([a-z]{2,3}_[a-z_]+)/i);
+            if (match) return match[1];
+            match = cmd.match(/\/([a-z]{2,3}_[a-z_]+[a-z0-9_]*)-[\d\.]+[^\/]*\.whl/i);
+            if (match) return match[1];
+            match = cmd.match(/\/([a-z]{2,3}_core[a-z_]+)-/i);
+            if (match) return match[1];
+            match = cmd.match(/pip\s+install\s+([a-z]{2,3}_[a-z_]+)/i);
+            if (match) return match[1];
+            return null;
+        }
+
+        // Update UI based on selection state
+        function updateUI() {
+            // Update preset model visuals
+            presetModels.forEach(opt => {
+                const checkbox = opt.querySelector('input[type="checkbox"]');
+                const modelId = opt.dataset.model;
+                if (selectedPresets.has(modelId)) {
+                    opt.classList.add('selected');
+                    checkbox.checked = true;
+                } else {
+                    opt.classList.remove('selected');
+                    checkbox.checked = false;
+                }
+            });
+
+            // Update custom option visuals
+            if (customSelected) {
+                customOption.classList.add('selected');
+                customCheckbox.checked = true;
+                customSection.classList.add('show');
+            } else {
+                customOption.classList.remove('selected');
+                customCheckbox.checked = false;
+                customSection.classList.remove('show');
+            }
+
+            // Update install button
+            updateInstallButton();
+        }
+
+        function updateInstallButton() {
+            const hasPresets = selectedPresets.size > 0;
+            const hasValidCustom = customSelected && isCustomValid();
+            installBtn.disabled = !(hasPresets || hasValidCustom);
+        }
+
+        function isCustomValid() {
+            const cmd = installCmdInput.value.trim();
+            const lang = customLangSelect.value;
+            if (!cmd || !lang) return false;
+
+            const cmdLower = cmd.toLowerCase();
+            const hasSpacy = cmdLower.includes('spacy');
+            const hasPip = cmdLower.includes('pip');
+            const isUrl = cmdLower.startsWith('http://') || cmdLower.startsWith('https://');
+
+            if (!hasSpacy && !hasPip && !isUrl) return false;
+            if (/[&;|$`<>]/.test(cmd)) return false;
+
+            return true;
+        }
+
+        // Clear all selections
+        function clearAllSelections() {
+            selectedPresets.clear();
+            customSelected = false;
+            installCmdInput.value = '';
+            customLangSelect.value = '';
+            installCmdInput.classList.remove('invalid', 'valid');
+            cmdValidation.textContent = '';
+            updateUI();
+        }
+
+        // Preset model click handler
+        presetModels.forEach(opt => {
+            opt.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const modelId = opt.dataset.model;
+
+                // Toggle selection
+                if (selectedPresets.has(modelId)) {
+                    selectedPresets.delete(modelId);
+                } else {
+                    selectedPresets.add(modelId);
+                }
+
+                updateUI();
+            });
+        });
+
+        // Custom option click handler
+        customOption.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            customSelected = !customSelected;
+            updateUI();
+
+            if (customSelected) {
+                // Focus on command input
+                setTimeout(() => installCmdInput.focus(), 100);
+            }
+        });
+
+        // Cancel custom button
+        cancelCustomBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            customSelected = false;
+            installCmdInput.value = '';
+            customLangSelect.value = '';
+            installCmdInput.classList.remove('invalid', 'valid');
+            cmdValidation.textContent = '';
+            updateUI();
+        });
+
+        // Click outside to deselect all (on page background)
+        document.addEventListener('click', (e) => {
+            const card = document.querySelector('.card');
+            const overlay = document.getElementById('progressOverlay');
+
+            // Only clear if clicking outside the card and not on overlay
+            if (!card.contains(e.target) && !overlay.contains(e.target)) {
+                clearAllSelections();
+            }
+        });
+
+        // Custom field validation on input
+        installCmdInput.addEventListener('input', validateCustomFields);
+        customLangSelect.addEventListener('change', validateCustomFields);
+
+        function validateCustomFields() {
+            const cmd = installCmdInput.value.trim();
+            const lang = customLangSelect.value;
+            let errorMsg = '';
+
+            if (cmd) {
+                const cmdLower = cmd.toLowerCase();
+                const hasSpacy = cmdLower.includes('spacy');
+                const hasPip = cmdLower.includes('pip');
+                const isUrl = cmdLower.startsWith('http://') || cmdLower.startsWith('https://');
+
+                if (!hasSpacy && !hasPip && !isUrl) {
+                    errorMsg = 'Must contain "spacy", "pip", or be a URL';
+                    installCmdInput.classList.add('invalid');
+                    installCmdInput.classList.remove('valid');
+                } else if (/[&;|$`<>]/.test(cmd)) {
+                    errorMsg = 'Shell operators not allowed (one command at a time)';
+                    installCmdInput.classList.add('invalid');
+                    installCmdInput.classList.remove('valid');
+                } else {
+                    installCmdInput.classList.remove('invalid');
+                    installCmdInput.classList.add('valid');
+                }
+            } else {
+                installCmdInput.classList.remove('invalid', 'valid');
+            }
+
+            cmdValidation.textContent = errorMsg;
+            if (errorMsg) {
+                cmdValidation.classList.add('error');
+            } else {
+                cmdValidation.classList.remove('error');
+            }
+
+            updateInstallButton();
+        }
+
+        // Install button - handles sequential installation
+        installBtn.addEventListener('click', async () => {
+            const modelsToInstall = [];
+
+            // Collect preset models
+            selectedPresets.forEach(modelId => {
+                const opt = document.querySelector(`.preset-model[data-model="${modelId}"]`);
+                const checkbox = opt.querySelector('input[type="checkbox"]');
+                modelsToInstall.push({
+                    install_cmd: checkbox.dataset.cmd,
+                    model_name: checkbox.dataset.modelName,
+                    lang_code: modelId
+                });
+            });
+
+            // Add custom model if selected and valid
+            if (customSelected && isCustomValid()) {
+                const cmd = installCmdInput.value.trim();
+                const lang = customLangSelect.value;
+                let modelName = extractModelName(cmd);
+                if (!modelName) {
+                    modelName = lang + '_custom_model';
+                }
+                modelsToInstall.push({
+                    install_cmd: cmd,
+                    model_name: modelName,
+                    lang_code: lang
+                });
+            }
+
+            if (modelsToInstall.length === 0) return;
+
+            // Show progress overlay
+            progressOverlay.classList.add('show');
+            installLog.textContent = `Installing ${modelsToInstall.length} model(s)...\n\n`;
+
+            let successCount = 0;
+            let failCount = 0;
+
+            // Install models sequentially
+            for (const model of modelsToInstall) {
+                installLog.textContent += `📦 Installing ${model.model_name}...\n`;
+                installLog.textContent += `   Command: ${model.install_cmd}\n`;
+
+                try {
+                    const response = await fetch('/api/install-model', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(model)
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        installLog.textContent += `   ✓ Success!\n\n`;
+                        successCount++;
+                    } else {
+                        installLog.textContent += `   ✗ Failed: ${data.error || 'Unknown error'}\n\n`;
+                        failCount++;
+                    }
+                } catch (error) {
+                    installLog.textContent += `   ✗ Error: ${error.message}\n\n`;
+                    failCount++;
+                }
+            }
+
+            // Summary
+            installLog.textContent += `\n---\n`;
+            installLog.textContent += `✓ Installed: ${successCount}\n`;
+            if (failCount > 0) {
+                installLog.textContent += `✗ Failed: ${failCount}\n`;
+            }
+
+            if (successCount > 0) {
+                installLog.textContent += `\nRedirecting to home page...`;
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                installLog.textContent += `\nNo models installed. Please try again.`;
+                setTimeout(() => {
+                    progressOverlay.classList.remove('show');
+                }, 3000);
+            }
+        });
+
+        // Initial state
+        updateUI();
+    </script>
+</body>
+
+</html>

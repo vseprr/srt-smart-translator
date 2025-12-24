@@ -12,16 +12,102 @@ import spacy
 from parser import SubtitleBlock
 
 
-# SpaCy modelini yükle (lazy loading için modül seviyesinde None)
-_nlp = None
+# SpaCy modelleri için cache (lazy loading)
+_nlp_models = {}
+
+# Dil kodlarından SpaCy model adlarına eşleme
+# DeepL dil kodları -> SpaCy model adları
+LANGUAGE_MODEL_MAP = {
+    # İngilizce - özel model
+    "EN": "en_core_web_sm",
+    "EN-US": "en_core_web_sm",
+    "EN-GB": "en_core_web_sm",
+    # Türkçe - özel model
+    "TR": "tr_core_web_md",
+}
+
+# Çoklu dil modeli (fallback)
+MULTI_LANG_MODEL = "xx_sent_ud_sm"
 
 
-def get_nlp():
-    """SpaCy modelini lazy load eder."""
-    global _nlp
-    if _nlp is None:
-        _nlp = spacy.load("en_core_web_sm")
-    return _nlp
+def get_nlp(source_lang: str = "EN"):
+    """
+    Kaynak dile göre uygun SpaCy modelini lazy load eder.
+    
+    Öncelik sırası:
+    1. Dile özel model (en_core_web_sm, tr_core_web_md)
+    2. Çoklu dil modeli (xx_sent_ud_sm)
+    3. Rule-based Sentencizer (fallback)
+    
+    Args:
+        source_lang: Kaynak dil kodu (DeepL formatında, örn: "EN", "TR", "DE")
+        
+    Returns:
+        SpaCy nlp nesnesi
+    """
+    global _nlp_models
+    
+    # Önce cache'e bak
+    if source_lang in _nlp_models:
+        return _nlp_models[source_lang]
+    
+    nlp = None
+    
+    # 1. Dile özel model dene
+    if source_lang in LANGUAGE_MODEL_MAP:
+        model_name = LANGUAGE_MODEL_MAP[source_lang]
+        try:
+            nlp = spacy.load(model_name)
+            print(f"  ✓ Loaded language-specific model: {model_name}")
+        except OSError:
+            print(f"  ⚠ Model not found: {model_name}, trying multi-language model...")
+    
+    # 2. Çoklu dil modeli dene
+    if nlp is None:
+        try:
+            nlp = spacy.load(MULTI_LANG_MODEL)
+            print(f"  ✓ Loaded multi-language model: {MULTI_LANG_MODEL}")
+        except OSError:
+            print(f"  ⚠ Multi-language model not found: {MULTI_LANG_MODEL}, using rule-based sentencizer...")
+    
+    # 3. Son çare: Rule-based Sentencizer
+    if nlp is None:
+        nlp = create_sentencizer_nlp(source_lang)
+        print(f"  ✓ Using rule-based sentencizer for: {source_lang}")
+    
+    # Cache'e kaydet
+    _nlp_models[source_lang] = nlp
+    return nlp
+
+
+def create_sentencizer_nlp(lang_code: str):
+    """
+    Belirtilen dil için rule-based Sentencizer oluşturur.
+    Noktalama işaretlerine göre cümle sonu tespit eder.
+    """
+    # Desteklenen SpaCy dil sınıfları
+    lang_classes = {
+        "TR": "tr", "EN": "en", "EN-US": "en", "EN-GB": "en",
+        "DE": "de", "FR": "fr", "ES": "es", "IT": "it",
+        "PT-PT": "pt", "PT-BR": "pt", "NL": "nl", "PL": "pl",
+        "RU": "ru", "JA": "ja", "ZH": "zh", "KO": "ko",
+        "AR": "ar", "BG": "bg", "CS": "cs", "DA": "da",
+        "EL": "el", "ET": "et", "FI": "fi", "HU": "hu",
+        "ID": "id", "LT": "lt", "LV": "lv", "NB": "nb",
+        "RO": "ro", "SK": "sk", "SL": "sl", "SV": "sv",
+        "UK": "uk",
+    }
+    
+    spacy_lang = lang_classes.get(lang_code, "xx")  # xx = multi-language
+    
+    try:
+        nlp = spacy.blank(spacy_lang)
+    except:
+        nlp = spacy.blank("xx")  # Fallback to multi-language blank
+    
+    # Sentencizer ekle - noktalama kurallarıyla cümle bölme
+    nlp.add_pipe("sentencizer")
+    return nlp
 
 
 @dataclass
@@ -35,7 +121,87 @@ class MergedSentence:
         return f"MergedSentence('{self.full_text[:50]}...' from {len(self.source_blocks)} blocks)"
 
 
-def merge_sentences(blocks: List[SubtitleBlock]) -> List[MergedSentence]:
+def merge_sentences_with_manager(blocks: List[SubtitleBlock], source_lang: str = "en") -> Tuple[List[MergedSentence], str, bool]:
+    """
+    Merge sentences using ModelManager for dynamic model selection.
+    
+    Args:
+        blocks: SubtitleBlock list
+        source_lang: ISO language code (e.g., 'en', 'tr', 'de')
+        
+    Returns:
+        Tuple of (merged_sentences, model_name, is_fallback)
+    """
+    if not blocks:
+        return [], "none", False
+    
+    # Use ModelManager for model selection
+    try:
+        from backend.model_manager import get_model_manager
+        manager = get_model_manager()
+        nlp, model_name, is_fallback = manager.get_model_for_language(source_lang)
+    except ImportError:
+        # Fallback to old behavior if backend not available
+        nlp = get_nlp(source_lang)
+        model_name = "legacy"
+        is_fallback = True
+    
+    # Rest of the merge logic
+    block_positions: List[Tuple[int, int, SubtitleBlock]] = []
+    full_text_parts = []
+    current_pos = 0
+    
+    for block in blocks:
+        text = block.text
+        start_pos = current_pos
+        end_pos = current_pos + len(text)
+        block_positions.append((start_pos, end_pos, block))
+        full_text_parts.append(text)
+        current_pos = end_pos + 1
+    
+    full_text = " ".join(full_text_parts)
+    doc = nlp(full_text)
+    
+    merged_sentences = []
+    
+    for sent in doc.sents:
+        sent_start = sent.start_char
+        sent_end = sent.end_char
+        sent_text = sent.text.strip()
+        
+        if not sent_text:
+            continue
+        
+        overlapping_blocks = []
+        char_contributions = []
+        
+        for block_start, block_end, block in block_positions:
+            overlap_start = max(sent_start, block_start)
+            overlap_end = min(sent_end, block_end)
+            
+            if overlap_start < overlap_end:
+                overlapping_blocks.append(block)
+                contribution = overlap_end - overlap_start
+                char_contributions.append(contribution)
+        
+        if overlapping_blocks:
+            total_chars = sum(char_contributions)
+            if total_chars > 0:
+                char_ratios = [c / total_chars for c in char_contributions]
+            else:
+                char_ratios = [1.0 / len(overlapping_blocks)] * len(overlapping_blocks)
+            
+            merged = MergedSentence(
+                full_text=sent_text,
+                source_blocks=overlapping_blocks,
+                char_ratios=char_ratios
+            )
+            merged_sentences.append(merged)
+    
+    return merged_sentences, model_name, is_fallback
+
+
+def merge_sentences(blocks: List[SubtitleBlock], source_lang: str = "EN") -> List[MergedSentence]:
     """
     Alt yazı bloklarını SpaCy ile gerçek cümle sınırlarına göre birleştirir.
     
@@ -47,6 +213,7 @@ def merge_sentences(blocks: List[SubtitleBlock]) -> List[MergedSentence]:
     
     Args:
         blocks: SubtitleBlock listesi
+        source_lang: Kaynak dil kodu (DeepL formatında, örn: "EN", "TR", "DE")
         
     Returns:
         List[MergedSentence]: Birleştirilmiş cümleler
@@ -54,7 +221,7 @@ def merge_sentences(blocks: List[SubtitleBlock]) -> List[MergedSentence]:
     if not blocks:
         return []
     
-    nlp = get_nlp()
+    nlp = get_nlp(source_lang)
     
     # Block sınırlarını ve pozisyonlarını izle
     # Her bloğun başlangıç ve bitiş karakter pozisyonunu tut
