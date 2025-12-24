@@ -121,7 +121,7 @@ python app.py
 
 ### First Run
 
-1. Open **http://localhost:5000** in your browser
+1. Browser opens automatically to **http://localhost:5000**
 2. You'll see the **Setup Wizard** 🧙‍♂️
 3. Select one or more language models to install:
    - 🇬🇧 English (en_core_web_sm)
@@ -129,29 +129,32 @@ python app.py
    - 🇪🇸 Spanish (es_core_news_sm)
    - 🇫🇷 French (fr_core_news_sm)
    - 🇩🇪 German (de_core_news_sm)
+   - 🌐 Multilingual (xx_sent_ud_sm) - works with any language
    - ➕ Custom (install from URL)
 4. Wait for installation to complete
 5. Enter your DeepL API key in Settings
 6. Start translating! 🎉
 
+> 💡 **Tip:** For multilingual models (xx_*), just type the install command - language is auto-selected as "Multilingual / Universal".
+
 ### Windows Quick Launch
 
-After initial setup, double-click `UI-Start.bat` to launch.
+After initial setup, double-click `UI-Start.bat` to launch (auto-setup if first time).
 
 ---
 
 ## 🚀 Usage
 
-1. **Start the server:** `python app.py`
-2. **Open browser:** http://localhost:5000
-3. **Upload SRT file** via drag-and-drop
-4. **Select target language** and click "Start Translation"
-5. **Download** the translated file when complete
+1. **Start the server:** `python app.py` (browser opens automatically)
+2. **Upload SRT file** via drag-and-drop
+3. **Select target language** and click "Start Translation"
+4. **Download** the translated file when complete
 
 ### Warnings System
 
-- ⚠️ **Language Mismatch** – Shows when no SpaCy model is installed for detected language
-- ⚠️ **Same Language** – Warns when source and target languages are the same
+- 🔴 **Language Mismatch** – No SpaCy model for detected language, using fallback
+- 🟣 **Universal Model** – Using multilingual model (works for all languages)
+- 🟠 **Same Language** – Source and target languages are the same
 
 ---
 
