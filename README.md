@@ -35,6 +35,14 @@
 
 ---
 
+## 🎥 Demo
+
+<p align="center">
+  <img src="assets/demo.gif" alt="Smart SRT Translator Demo" width="700"/>
+</p>
+
+---
+
 ## 🎯 The Problem: Why Context Matters?
 
 ### Turkish → English Example
