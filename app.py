@@ -8,6 +8,7 @@ import os
 import json
 import uuid
 import threading
+import webbrowser
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, Response, send_file, redirect, url_for
 from werkzeug.utils import secure_filename
@@ -615,5 +616,13 @@ if __name__ == '__main__':
     
     print("  Exit:    Ctrl+C")
     print()
+    
+    # Auto-open browser after short delay
+    def open_browser():
+        import time
+        time.sleep(1.5)  # Wait for server to be ready
+        webbrowser.open('http://localhost:5000')
+    
+    threading.Thread(target=open_browser, daemon=True).start()
     
     app.run(debug=False, host='0.0.0.0', port=5000)
