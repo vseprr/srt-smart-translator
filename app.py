@@ -359,13 +359,22 @@ def upload_file():
     if matching_model:
         active_model_name = matching_model.get('model_name', '')
         active_model_lang = matching_model.get('language_name', '')
-    elif installed_models:
-        # Fallback to first installed model
-        active_model_name = installed_models[0].get('model_name', 'en_core_web_sm')
-        active_model_lang = installed_models[0].get('language_name', 'English')
     else:
-        active_model_name = 'sentencizer'
-        active_model_lang = 'Rule-based'
+        # Check for multilingual model first
+        multilingual_model = next(
+            (m for m in installed_models if m.get('lang_code') == 'xx' or 'xx_' in m.get('model_name', '')), 
+            None
+        )
+        if multilingual_model:
+            active_model_name = multilingual_model.get('model_name', '')
+            active_model_lang = 'Multilingual'
+        elif installed_models:
+            # Fallback to first installed model
+            active_model_name = installed_models[0].get('model_name', 'en_core_web_sm')
+            active_model_lang = installed_models[0].get('language_name', 'English')
+        else:
+            active_model_name = 'sentencizer'
+            active_model_lang = 'Rule-based'
     
     # Create job status
     translation_jobs[job_id] = {
@@ -381,9 +390,15 @@ def upload_file():
         'warning': None
     }
     
-    # Set warning if mismatch
+    # Determine if using multilingual model
+    is_multilingual = 'xx_' in active_model_name or active_model_lang == 'Multilingual'
+    
+    # Set warning if mismatch (different message for multilingual)
     if not has_matching_model and detected_lang != 'unknown':
-        translation_jobs[job_id]['warning'] = f"Detected {ALL_LANGUAGES.get(detected_lang, detected_lang)}, but using {active_model_name}"
+        if is_multilingual:
+            translation_jobs[job_id]['warning'] = f"Using universal model for {ALL_LANGUAGES.get(detected_lang, detected_lang)}. Works well for most languages."
+        else:
+            translation_jobs[job_id]['warning'] = f"No {ALL_LANGUAGES.get(detected_lang, detected_lang)} model installed. Using {active_model_name} as fallback."
     
     return jsonify({
         'job_id': job_id,
@@ -393,6 +408,7 @@ def upload_file():
         'lang_name': ALL_LANGUAGES.get(detected_lang, detected_lang.upper()),
         'confidence': confidence,
         'has_matching_model': has_matching_model,
+        'is_multilingual': is_multilingual,
         'active_model_name': active_model_name,
         'active_model_lang': active_model_lang,
         'warning': translation_jobs[job_id].get('warning')

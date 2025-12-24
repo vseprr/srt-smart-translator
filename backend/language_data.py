@@ -45,6 +45,7 @@ PRESET_MODELS = [
 
 # ISO 639-1 to language name mapping (for Custom dropdown)
 ALL_LANGUAGES = {
+    "xx": "Multilingual / Universal",
     "af": "Afrikaans",
     "ar": "Arabic",
     "bg": "Bulgarian",

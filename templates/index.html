@@ -218,11 +218,11 @@
 
                 <!-- Language Mismatch Warning (hidden by default, shown via JS) -->
                 <div id="languageWarning"
-                    style="display: none; margin-bottom: 16px; padding: 12px 16px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px;">
+                    style="display: none; margin-bottom: 16px; padding: 12px 16px; border-radius: 8px;">
                     <div style="display: flex; align-items: flex-start; gap: 10px;">
-                        <span style="color: var(--error); font-size: 1.1rem;">⚠️</span>
+                        <span id="warningIcon" style="font-size: 1.1rem;">⚠️</span>
                         <div>
-                            <div style="font-size: 0.85rem; font-weight: 600; color: var(--error); margin-bottom: 4px;">
+                            <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;" id="warningTitle">
                                 Language Mismatch</div>
                             <div style="font-size: 0.8rem; color: var(--text-secondary);" id="warningMessage"></div>
                         </div>
@@ -650,16 +650,44 @@
                 activeModelLang.textContent = '(' + uploadData.lang_name + ')';
                 languageWarning.style.display = 'none';
             } else if (uploadData.detected_lang && uploadData.detected_lang !== 'unknown') {
-                // No matching model - show warning and fallback
-                activeModelBadge.style.background = 'rgba(245, 158, 11, 0.1)';
-                activeModelBadge.style.border = '1px solid rgba(245, 158, 11, 0.3)';
-                activeModelName.style.color = '#f59e0b';
-                activeModelName.textContent = 'Fallback: ' + (uploadData.active_model_name || 'en_core_web_sm');
-                activeModelLang.textContent = '(' + (uploadData.active_model_lang || 'English') + ' - Default)';
+                // No matching model - check if multilingual or fallback
+                const isMultilingual = uploadData.is_multilingual;
 
-                // Show warning message
-                languageWarning.style.display = 'block';
-                warningMessage.textContent = `Detected ${uploadData.lang_name}, but no SpaCy model installed for this language. Using ${uploadData.active_model_name || 'English model'} as fallback. You can install the correct model from Settings.`;
+                if (isMultilingual) {
+                    // Multilingual model - blue/info style
+                    activeModelBadge.style.background = 'rgba(99, 102, 241, 0.1)';
+                    activeModelBadge.style.border = '1px solid rgba(99, 102, 241, 0.3)';
+                    activeModelName.style.color = 'var(--accent-primary)';
+                    activeModelName.textContent = uploadData.active_model_name || 'xx_sent_ud_sm';
+                    activeModelLang.textContent = '(Universal)';
+
+                    // Show info-style warning
+                    languageWarning.style.display = 'block';
+                    languageWarning.style.background = 'rgba(99, 102, 241, 0.1)';
+                    languageWarning.style.border = '1px solid rgba(99, 102, 241, 0.3)';
+                    document.getElementById('warningIcon').textContent = 'ℹ️';
+                    document.getElementById('warningIcon').style.color = 'var(--accent-primary)';
+                    document.getElementById('warningTitle').textContent = 'Using Universal Model';
+                    document.getElementById('warningTitle').style.color = 'var(--accent-primary)';
+                    warningMessage.textContent = uploadData.warning || `Universal model works well for ${uploadData.lang_name}. For best results, install a dedicated model from Settings.`;
+                } else {
+                    // Regular fallback - orange/warning style
+                    activeModelBadge.style.background = 'rgba(245, 158, 11, 0.1)';
+                    activeModelBadge.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+                    activeModelName.style.color = '#f59e0b';
+                    activeModelName.textContent = 'Fallback: ' + (uploadData.active_model_name || 'en_core_web_sm');
+                    activeModelLang.textContent = '(' + (uploadData.active_model_lang || 'English') + ')';
+
+                    // Show warning-style message
+                    languageWarning.style.display = 'block';
+                    languageWarning.style.background = 'rgba(239, 68, 68, 0.1)';
+                    languageWarning.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                    document.getElementById('warningIcon').textContent = '⚠️';
+                    document.getElementById('warningIcon').style.color = 'var(--error)';
+                    document.getElementById('warningTitle').textContent = 'Language Mismatch';
+                    document.getElementById('warningTitle').style.color = 'var(--error)';
+                    warningMessage.textContent = `Detected ${uploadData.lang_name}, but no SpaCy model installed for this language. Using ${uploadData.active_model_name || 'English model'} as fallback. You can install the correct model from Settings.`;
+                }
             }
 
             // Check for same language warning

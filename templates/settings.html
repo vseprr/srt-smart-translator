@@ -523,7 +523,16 @@
         const addModelBtn = document.getElementById('addModelBtn');
         const addBtnText = document.getElementById('addBtnText');
 
-        addCmd.addEventListener('input', validateAddFields);
+        addCmd.addEventListener('input', () => {
+            // Auto-detect multilingual model and select 'xx'
+            const cmd = addCmd.value.toLowerCase();
+            if (cmd.includes('xx_') || cmd.match(/\bxx[_-]/)) {
+                if (addLang.value !== 'xx') {
+                    addLang.value = 'xx';
+                }
+            }
+            validateAddFields();
+        });
         addLang.addEventListener('change', validateAddFields);
 
         // Extract model name from command/URL

@@ -505,7 +505,16 @@
         });
 
         // Custom field validation on input
-        installCmdInput.addEventListener('input', validateCustomFields);
+        installCmdInput.addEventListener('input', () => {
+            // Auto-detect multilingual model and select 'xx'
+            const cmd = installCmdInput.value.toLowerCase();
+            if (cmd.includes('xx_') || cmd.match(/\bxx[_-]/)) {
+                if (customLangSelect.value !== 'xx') {
+                    customLangSelect.value = 'xx';
+                }
+            }
+            validateCustomFields();
+        });
         customLangSelect.addEventListener('change', validateCustomFields);
 
         function validateCustomFields() {
