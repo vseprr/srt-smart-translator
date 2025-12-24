@@ -2,6 +2,7 @@
 .env
 *.env.*
 config.json
+models.json
 
 # Python
 __pycache__/
